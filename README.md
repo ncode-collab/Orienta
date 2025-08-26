@@ -90,3 +90,62 @@ On load, Orienta runs lightweight self-tests in the browser console:
 ✅ Time formatting works
 
 ✅ Orientation detection works
+
+📓 Example Structured Prompt (used for Orienta)
+
+Role:
+You are a senior front-end engineer and UX specialist building a mobile-first, browser-only web application.
+
+Task:
+Develop a one-page web app that detects device orientation and displays different features:
+- Portrait (upright) → Alarm Clock
+- Landscape (right-side up) → Stopwatch
+- Portrait (upside down) → Timer
+- Landscape (right-side up, alternate view) → Weather of the Day (from a free weather API)
+
+Constraints:
+- Must run entirely in the browser (no native apps, no server-side code).
+- Mobile-first design: responsive, touch-friendly, accessible (WCAG 2.1 AA).
+- Use Screen Orientation API with fallbacks (matchMedia, deviceorientation).
+- Smooth transitions (<200ms), no flicker.
+- Use vanilla JavaScript, CSS (Tailwind CDN or plain CSS), and HTML only.
+- Use Web Workers for time-based functions (stopwatch, timer, alarm).
+- Weather API must be free-tier and keyless (e.g., Open-Meteo).
+- Code should be modular, efficient, and commented.
+
+Color Scheme Strategy:
+- Use a neutral dark background (#121212) for consistency across modes.
+- Define one accent color per feature:
+  - Alarm → Warm Red (#E63946)
+  - Stopwatch → Bright Blue (#0077B6)
+  - Timer → Amber/Orange (#F4A261)
+  - Weather → Teal/Green (#2A9D8F)
+- Text color: high-contrast white (#FFFFFF) or off-white (#E0E0E0).
+- Secondary text: soft gray (#9E9E9E).
+- Buttons: filled with feature accent color; hover/active = darker shade.
+- Ensure contrast ratio ≥ 4.5:1 for accessibility.
+- Respect prefers-color-scheme: auto-switch to light theme (light background + same accent system).
+
+Inputs:
+- Device orientation events (portrait/landscape, including upside-down).
+- API response from weather service.
+
+Outputs:
+1. A single self-contained index.html file including:
+   - <style> section with color tokens and responsive design
+   - <script type="module"> with orientation controller, time engine, weather service
+   - UI panels for Alarm, Stopwatch, Timer, Weather
+2. Inline comments explaining logic and color usage.
+3. Console-based test harness that verifies:
+   - Orientation correctly switches to each feature
+   - Stopwatch precision (ms level)
+   - Timer and Alarm accuracy across tab switches
+   - Weather loads with offline fallback
+   - Each mode applies its feature-specific accent color
+4. Explanation (short text) of how orientation detection, fallback logic, and color strategy are implemented.
+
+Format:
+- Section 1: Full Code (index.html)
+- Section 2: Console Test Cases
+- Section 3: Explanation of Approach
+- Section 4: Color Scheme & Accessibility Notes
