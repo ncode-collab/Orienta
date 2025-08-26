@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Orientation Tools – Alarm · Stopwatch · Timer · Weather</title>
+  <meta name="theme-color" content="#121212" />
+  <style>
+    /* ==========================================================
+       Color Scheme Strategy (tokens)
+       ========================================================== */
+    :root {
+      --bg: #121212;            /* neutral dark */
+      --surface: #1E1E1E;
+      --text: #FFFFFF;
+      --text-muted: #B3B3B3;
+      --border: #2A2A2A;
+      /* Feature accents */
+      --accent-alarm: #E63946;     /* red */
+      --accent-stopwatch: #0077B6; /* blue */
+      --accent-timer: #F4A261;     /* amber */
+      --accent-weather: #2A9D8F;   /* teal */
+      --shadow: 0 6px 20px rgba(0,0,0,.35);
+      --radius: 18px;
+      --focus: 0 0 0 3px rgba(255,255,255,.18);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #FAFAFA;
+        --surface: #FFFFFF;
+        --text: #0F172A;
+        --text-muted: #475569;
+        --border: #E5E7EB;
+        --focus: 0 0 0 3px rgba(0,0,0,.15);
+      }
+    }
+
+    /* ==========================================================
+       Base Layout & Typography
+       ========================================================== */
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      touch-action: manipulation;
+    }
+    .container { max-width: 720px; margin: 0 auto; padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,0));
+      backdrop-filter: blur(6px);
+      padding: 12px 8px 4px;
+    }
+    .title { display: flex; align-items: center; gap: 10px; }
+    .badge { font-size: 12px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 8px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      box-shadow: var(--shadow); border-radius: var(--radius);
+      padding: 16px; margin: 12px 0; transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .card:focus-within { box-shadow: var(--focus), var(--shadow); }
+
+    .mode-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .mode-title { font-weight: 700; font-size: 20px; letter-spacing: .2px; }
+    .orientation-indicator { font-size: 12px; color: var(--text-muted); }
+
+    .grid {
+      display: grid; gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Buttons */
+    .btn {
+      appearance: none; border: 0; border-radius: 14px; padding: 14px 16px; font-weight: 600;
+      color: #fff; background: #3b82f6; box-shadow: var(--shadow);
+      width: 100%; cursor: pointer; transition: transform .06s ease;
+    }
+    .btn:active { transform: translateY(1px) scale(.99); }
+    .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn.ghost { background: transparent; color: var(--text-muted); border: 0; box-shadow: none; }
+
+    /* Feature accent utility classes */
+    .accent-alarm { --accent: var(--accent-alarm); }
+    .accent-stopwatch { --accent: var(--accent-stopwatch); }
+    .accent-timer { --accent: var(--accent-timer); }
+    .accent-weather { --accent: var(--accent-weather); }
+    .accent-bg { background: var(--accent); }
+    .accent-text { color: var(--accent); }
+    .accent-ring { box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent); }
+
+    .digits { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; letter-spacing: .5px; font-size: 44px; text-align: center; margin: 8px 0 14px; }
+    .subdigits { font-variant-numeric: tabular-nums; opacity: .85; text-align: center; margin-top: -4px; }
+
+    .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .controls .btn { min-height: 48px; }
+
+    .muted { color: var(--text-muted); font-size: 13px; }
+
+    .row { display:flex; gap: 10px; align-items:center; }
+    .row > * { flex: 1; }
+
+    .input, select {
+      background: transparent; color: var(--text); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; width: 100%;
+    }
+
+    .pillbar { display:flex; gap:8px; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--border); color: var(--text-muted); padding: 6px 10px; border-radius: 999px; font-size: 12px;
+    }
+
+    .skeleton { background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.14), rgba(255,255,255,.06)); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 12px; height: 28px; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* Toast */
+    #toast { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      background: var(--surface); color: var(--text); padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); display:none; box-shadow: var(--shadow); }
+
+    /* Transitions, honor reduced motion */
+    @media (prefers-reduced-motion: no-preference) {
+      .swap-enter { opacity: 0; transform: translateY(4px); }
+      .swap-enter.swap-enter-active { opacity: 1; transform: none; transition: opacity .18s ease, transform .18s ease; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <div style="font-weight:800; font-size:20px;">Orientation Tools</div>
+        <span class="badge" id="modeBadge">—</span>
+        <span class="badge" id="orientBadge">Detecting…</span>
+      </div>
+      <div class="pillbar" aria-live="polite">
+        <span class="pill">Portrait ↑ → <strong>Alarm</strong></span>
+        <span class="pill">Portrait ↓ → <strong>Timer</strong></span>
+        <span class="pill">Landscape ↔ primary → <strong>Stopwatch</strong></span>
+        <span class="pill">Landscape ↔ secondary → <strong>Weather</strong></span>
+      </div>
+    </header>
+
+    <!-- Alarm Panel -->
+    <section id="panel-alarm" class="panel card accent-alarm" aria-labelledby="h-alarm" role="region">
+      <div class="mode-header">
+        <div class="mode-title">⏰ <span id="h-alarm">Alarm</span></div>
+        <span class="orientation-indicator accent-text">Alarm uses device time</span>
+      </div>
+      <div class="digits" id="alarmNow">--:--</div>
+      <div class="row">
+        <input id="alarmTime" class="input" type="time" aria-label="Set alarm time" />
+        <button id="setAlarmBtn" class="btn accent-bg">Set</button>
+      </div>
+      <div class="controls" style="margin-top:10px;">
+        <button id="cancelAlarmBtn" class="btn secondary">Cancel</button>
+        <button id="snoozeBtn" class="btn secondary">Snooze 5m</button>
+        <button id="testAlarmBtn" class="btn ghost">Test</button>
+      </div>
+      <div class="muted" id="alarmStatus" style="margin-top:8px;">No alarm set.</div>
+    </section>
+
+    <!-- Stopwatch Panel -->
+    <section id="panel-stopwatch" class="panel card accent-stopwatch" aria-labelledby="h-stopwatch" role="region">
+      <div class="mode-header">
+        <div class="mode-title">⏱️ <span id="h-stopwatch">Stopwatch</span></div>
+        <span class="orientation-indicator accent-text">Landscape (primary)</span>
+      </div>
+      <div class="digits" id="swDisplay">00:00:00.000</div>
+      <div class="controls">
+        <button id="swStart" class="btn accent-bg">Start</button>
+        <button id="swLap" class="btn secondary">Lap</button>
+        <button id="swReset" class="btn secondary">Reset</button>
+      </div>
+      <ul id="swLaps" class="muted" style="list-style:none; padding-left:0; margin-top:10px;"></ul>
+    </section>
+
+    <!-- Timer Panel -->
+    <section id="panel-timer" class="panel card accent-timer" aria-labelledby="h-timer" role="region">
+      <div class="mode-header">
+        <div class="mode-title">⏳ <span id="h-timer">Timer</span></div>
+        <span class="orientation-indicator accent-text">Portrait (upside down)</span>
+      </div>
+      <div class="row">
+        <input id="timerMinutes" class="input" type="number" min="0" placeholder="Min" aria-label="Minutes" />
+        <input id="timerSeconds" class="input" type="number" min="0" max="59" placeholder="Sec" aria-label="Seconds" />
+      </div>
+      <div class="digits" id="timerDisplay">00:00</div>
+      <div class="controls">
+        <button id="timerStart" class="btn accent-bg">Start</button>
+        <button id="timerPause" class="btn secondary">Pause</button>
+        <button id="timerReset" class="btn secondary">Reset</button>
+      </div>
+      <div class="muted" id="timerStatus" style="margin-top:8px;">Set a duration and press Start.</div>
+    </section>
+
+    <!-- Weather Panel -->
+    <section id="panel-weather" class="panel card accent-weather" aria-labelledby="h-weather" role="region">
+      <div class="mode-header">
+        <div class="mode-title">☀️ <span id="h-weather">Weather of the Day</span></div>
+        <span class="orientation-indicator accent-text">Landscape (secondary)</span>
+      </div>
+      <div id="weatherBlock">
+        <div class="row">
+          <input id="cityInput" class="input" placeholder="City (optional)" aria-label="City" />
+          <button id="weatherRefresh" class="btn secondary">Refresh</button>
+        </div>
+        <div style="margin-top:10px;" id="weatherResult">
+          <div class="skeleton" aria-hidden="true"></div>
+        </div>
+        <div class="muted" style="margin-top:8px;">Tip: Allow location for local weather, or type a city and press Refresh.</div>
+      </div>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module">
+    /* ==========================================================
+       Tiny Toast helper
+       ========================================================== */
+    const toastEl = document.getElementById('toast');
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.style.display = 'block';
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(()=> toastEl.style.display='none', 1800);
+    }
+
+    /* ==========================================================
+       Web Worker (time engine) via Blob URL
+       - drift-corrected ticks using performance.now()
+       ========================================================== */
+    const workerCode = `
+      let origin = performance.now();
+      let startTime = null; // for stopwatch
+      let pausedAt = 0;
+      let timerTarget = null; // epoch ms
+      let alarmAt = null; // epoch ms (today)
+      let running = false;
+
+      function post(type, data={}){ postMessage({type, now: Date.now(), perf: performance.now(), ...data}); }
+
+      function loop(){
+        if(!running){ setTimeout(loop, 60); return; }
+        const nowPerf = performance.now();
+        // Stopwatch
+        if(startTime!==null){
+          const elapsedMs = (nowPerf - startTime) + pausedAt;
+          post('tick', {elapsedMs});
+        }
+        // Timer countdown
+        if(timerTarget){
+          const remain = timerTarget - Date.now();
+          post('timer', {remainingMs: Math.max(0, remain)});
+          if(remain <= 0){ timerTarget=null; post('timer-done', {}); }
+        }
+        // Alarm
+        if(alarmAt){
+          if(Date.now() >= alarmAt){ post('alarm', {}); alarmAt=null; }
+        }
+        setTimeout(loop, 60); // ~16-66ms adaptive
+      }
+
+      onmessage = (e)=>{
+        const {cmd, payload} = e.data || {};
+        if(cmd==='sw-start'){ running=true; if(startTime===null){ startTime = performance.now(); } }
+        if(cmd==='sw-stop'){ running=false; if(startTime!==null){ pausedAt += performance.now() - startTime; startTime = null; } }
+        if(cmd==='sw-reset'){ startTime=null; pausedAt=0; post('tick', {elapsedMs:0}); }
+        if(cmd==='timer-start'){ running=true; timerTarget = Date.now() + (payload.seconds*1000); }
+        if(cmd==='timer-pause'){ running=false; if(timerTarget){ const remain = Math.max(0, timerTarget - Date.now()); post('timer', {remainingMs: remain}); } }
+        if(cmd==='timer-reset'){ timerTarget=null; post('timer', {remainingMs: 0}); }
+        if(cmd==='alarm-set'){ alarmAt = payload.at; post('alarm-set', {at: alarmAt}); }
+        if(cmd==='alarm-cancel'){ alarmAt = null; post('alarm-cancel', {}); }
+        if(cmd==='loop-start'){ running=true; }
+        if(cmd==='loop-stop'){ running=false; }
+      };
+      running=true; loop();
+    `;
+    const workerUrl = URL.createObjectURL(new Blob([workerCode], {type:'text/javascript'}));
+    const engine = new Worker(workerUrl);
+
+    /* ==========================================================
+       Utility formatters
+       ========================================================== */
+    const pad = (n, w=2) => n.toString().padStart(w, '0');
+    function fmtHMSms(ms){
+      const h = Math.floor(ms/3600000); ms%=3600000;
+      const m = Math.floor(ms/60000); ms%=60000;
+      const s = Math.floor(ms/1000); const msr = Math.floor(ms%1000);
+      return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(msr,3)}`;
+    }
+    function fmtMMSS(ms){
+      const m = Math.floor(ms/60000); const s = Math.floor((ms%60000)/1000);
+      return `${pad(m)}:${pad(s)}`;
+    }
+
+    /* ==========================================================
+       Orientation Detection with Fallbacks
+       - screen.orientation.type
+       - matchMedia("(orientation: portrait)")
+       - deviceorientation angle heuristic
+       ========================================================== */
+    const modeBadge = document.getElementById('modeBadge');
+    const orientBadge = document.getElementById('orientBadge');
+
+    const Panels = {
+      alarm: document.getElementById('panel-alarm'),
+      stopwatch: document.getElementById('panel-stopwatch'),
+      timer: document.getElementById('panel-timer'),
+      weather: document.getElementById('panel-weather'),
+    };
+
+    let currentPanel = null;
+
+    function setActivePanel(name){
+      for(const k in Panels){ Panels[k].classList.remove('active'); }
+      const el = Panels[name];
+      if(!el) return;
+      el.classList.add('active', 'swap-enter');
+      requestAnimationFrame(()=> el.classList.add('swap-enter-active'));
+      setTimeout(()=> el.classList.remove('swap-enter','swap-enter-active'), 240);
+      currentPanel = name;
+      modeBadge.textContent = name.charAt(0).toUpperCase()+name.slice(1);
+    }
+
+    function getOrientationDetail(){
+      // returns {layout: 'portrait'|'landscape', inverted: boolean, rawAngle?:number, type?:string}
+      let layout = null, inverted = false, rawAngle = null, type = null;
+      try {
+        if(screen.orientation && screen.orientation.type){
+          type = screen.orientation.type; // e.g., 'portrait-primary', 'portrait-secondary', 'landscape-primary', 'landscape-secondary'
+          if(type.startsWith('portrait')) layout = 'portrait'; else if(type.startsWith('landscape')) layout = 'landscape';
+          inverted = type.endsWith('secondary');
+        }
+      } catch {}
+      if(!layout){
+        layout = window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
+      }
+      // Heuristic: use DeviceOrientationEvent to detect upside-down portrait if type missing
+      function handleAngle(e){
+        // gamma: left/right tilt; beta: front/back. We'll approximate top/bottom via beta sign.
+        rawAngle = (typeof e.beta === 'number') ? e.beta : 0;
+        // For phones, when upside-down portrait beta often near -180 or +180
+        if(layout==='portrait'){
+          inverted = Math.abs(rawAngle) > 100; // rough heuristic
+        }
+      }
+      return {layout, inverted, rawAngle, type};
+    }
+
+    function updateOrientation(){
+      const o = getOrientationDetail();
+      let mode = 'alarm';
+      if(o.layout === 'portrait') {
+        mode = o.inverted ? 'timer' : 'alarm';
+      } else {
+        // Landscape: distinguish primary vs secondary when possible. Fallback: primary->stopwatch
+        if(o.type){
+          mode = o.type.endsWith('secondary') ? 'weather' : 'stopwatch';
+        } else {
+          // if we can't tell, default to stopwatch; user can hit Refresh for weather
+          mode = 'stopwatch';
+        }
+      }
+      setActivePanel(mode);
+      orientBadge.textContent = `${o.layout}${o.inverted? ' (secondary)': ' (primary)'}`;
+    }
+
+    // Debounced orientation listener
+    let orientTimer = 0;
+    function debouncedUpdate(){
+      clearTimeout(orientTimer); orientTimer = setTimeout(updateOrientation, 120);
+    }
+
+    // Listeners
+    if('onorientationchange' in window) window.addEventListener('orientationchange', debouncedUpdate, {passive:true});
+    if(window.matchMedia){
+      try {
+        window.matchMedia('(orientation: portrait)').addEventListener('change', debouncedUpdate, {passive:true});
+      } catch {}
+    }
+    try { window.addEventListener('deviceorientation', debouncedUpdate, {passive:true}); } catch {}
+
+    // Init
+    updateOrientation();
+
+    /* ==========================================================
+       Alarm Logic
+       ========================================================== */
+    const alarmNow = document.getElementById('alarmNow');
+    const alarmTime = document.getElementById('alarmTime');
+    const setAlarmBtn = document.getElementById('setAlarmBtn');
+    const cancelAlarmBtn = document.getElementById('cancelAlarmBtn');
+    const snoozeBtn = document.getElementById('snoozeBtn');
+    const testAlarmBtn = document.getElementById('testAlarmBtn');
+    const alarmStatus = document.getElementById('alarmStatus');
+
+    function updateClock(){
+      const d = new Date();
+      alarmNow.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    function nextAlarmEpochFromHHMM(hhmm){
+      const [h,m] = hhmm.split(':').map(Number);
+      const now = new Date();
+      const when = new Date();
+      when.setHours(h, m, 0, 0);
+      if(when <= now) when.setDate(when.getDate()+1);
+      return when.getTime();
+    }
+
+    setAlarmBtn.addEventListener('click', ()=>{
+      if(!alarmTime.value){ toast('Pick a time first'); return; }
+      const at = nextAlarmEpochFromHHMM(alarmTime.value);
+      engine.postMessage({cmd:'alarm-set', payload:{at}});
+    });
+    cancelAlarmBtn.addEventListener('click', ()=> engine.postMessage({cmd:'alarm-cancel'}));
+    snoozeBtn.addEventListener('click', ()=> {
+      const at = Date.now() + 5*60*1000; engine.postMessage({cmd:'alarm-set', payload:{at}});
+      toast('Snoozed 5 minutes');
+    });
+    testAlarmBtn.addEventListener('click', ()=> {
+      engine.postMessage({cmd:'alarm-set', payload:{at: Date.now()+1500}});
+      toast('Test alarm in 1.5s');
+    });
+
+    /* ==========================================================
+       Stopwatch Logic
+       ========================================================== */
+    const swDisplay = document.getElementById('swDisplay');
+    const swStart = document.getElementById('swStart');
+    const swLap = document.getElementById('swLap');
+    const swReset = document.getElementById('swReset');
+    const swLaps = document.getElementById('swLaps');
+    let swRunning = false;
+
+    swStart.addEventListener('click', ()=>{
+      swRunning = !swRunning;
+      if(swRunning){ engine.postMessage({cmd:'sw-start'}); swStart.textContent = 'Pause'; swStart.classList.add('accent-bg'); }
+      else { engine.postMessage({cmd:'sw-stop'}); swStart.textContent = 'Start'; swStart.classList.remove('accent-bg'); }
+    });
+    swReset.addEventListener('click', ()=>{ engine.postMessage({cmd:'sw-reset'}); swLaps.innerHTML=''; swStart.textContent='Start'; swRunning=false; });
+    swLap.addEventListener('click', ()=>{
+      const li = document.createElement('li');
+      li.textContent = `Lap · ${swDisplay.textContent}`;
+      swLaps.prepend(li);
+      if(navigator.share){
+        // quick share of the lap time
+        navigator.share({title:'Stopwatch Lap', text: li.textContent}).catch(()=>{});
+      }
+    });
+
+    /* ==========================================================
+       Timer Logic
+       ========================================================== */
+    const timerMinutes = document.getElementById('timerMinutes');
+    const timerSeconds = document.getElementById('timerSeconds');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerStart = document.getElementById('timerStart');
+    const timerPause = document.getElementById('timerPause');
+    const timerReset = document.getElementById('timerReset');
+    const timerStatus = document.getElementById('timerStatus');
+
+    let timerActive = false;
+
+    timerStart.addEventListener('click', ()=>{
+      const s = (parseInt(timerMinutes.value||'0',10)*60) + (parseInt(timerSeconds.value||'0',10));
+      if(!s){ toast('Set a duration'); return; }
+      timerActive = true; engine.postMessage({cmd:'timer-start', payload:{seconds:s}});
+      timerStatus.textContent = 'Timer running…';
+    });
+    timerPause.addEventListener('click', ()=>{ timerActive=false; engine.postMessage({cmd:'timer-pause'}); timerStatus.textContent = 'Paused'; });
+    timerReset.addEventListener('click', ()=>{ timerActive=false; engine.postMessage({cmd:'timer-reset'}); timerDisplay.textContent='00:00'; timerStatus.textContent = 'Reset'; });
+
+    /* ==========================================================
+       Engine message handling + completion cues
+       ========================================================== */
+    const audioCtx = (window.AudioContext||window.webkitAudioContext) ? new (window.AudioContext||window.webkitAudioContext)(): null;
+    function beep(){
+      try{
+        if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(.0001,audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(.18,audioCtx.currentTime+.01);
+        g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.25);
+        o.start(); o.stop(audioCtx.currentTime+.26);
+      }catch{}
+    }
+
+    engine.onmessage = (e)=>{
+      const {type, elapsedMs, remainingMs} = e.data;
+      if(type==='tick'){ swDisplay.textContent = fmtHMSms(Math.max(0, Math.floor(elapsedMs||0))); }
+      if(type==='timer'){ timerDisplay.textContent = fmtMMSS(remainingMs||0); }
+      if(type==='timer-done'){ toast('⏳ Timer done'); navigator.vibrate?.(200); beep(); timerStatus.textContent='Done'; }
+      if(type==='alarm'){ toast('⏰ Alarm!'); navigator.vibrate?.([120,80,120]); beep(); alarmStatus.textContent = 'Ringing…'; }
+      if(type==='alarm-set'){ const t = new Date(e.data.at); alarmStatus.textContent = 'Alarm set for '+ t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); toast('Alarm set'); }
+      if(type==='alarm-cancel'){ alarmStatus.textContent = 'Alarm cancelled.'; toast('Alarm cancelled'); }
+    };
+
+    /* ==========================================================
+       Weather (Open-Meteo) – keyless
+       ========================================================== */
+    const cityInput = document.getElementById('cityInput');
+    const weatherRefresh = document.getElementById('weatherRefresh');
+    const weatherResult = document.getElementById('weatherResult');
+
+    async function geocodeCity(name){
+      // Use Open-Meteo geocoding (keyless)
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`;
+      const r = await fetch(url); if(!r.ok) throw new Error('geo fail');
+      const j = await r.json(); if(!j.results || !j.results[0]) throw new Error('not found');
+      const g = j.results[0]; return {lat: g.latitude, lon: g.longitude};
+    }
+    async function getWeather({lat, lon}){
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=celsius&timezone=auto`;
+      const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('weather fail');
+      const j = await r.json();
+      const temp = j.current?.temperature_2m; const code = j.current?.weather_code;
+      const icon = weatherIcon(code);
+      return {tempC: temp, code, icon};
+    }
+    function weatherIcon(code){
+      // Minimal mapping
+      if(code===0) return '☀️ Clear';
+      if([1,2,3].includes(code)) return '⛅️ Cloudy';
+      if([45,48].includes(code)) return '🌫️ Fog';
+      if([51,53,55,56,57].includes(code)) return '🌧️ Drizzle';
+      if([61,63,65,66,67,80,81,82].includes(code)) return '🌧️ Rain';
+      if([71,73,75,77,85,86].includes(code)) return '❄️ Snow';
+      if([95,96,99].includes(code)) return '⛈️ Storm';
+      return '🌡️';
+    }
+
+    function renderWeather({tempC, icon}){
+      weatherResult.innerHTML = `
+        <div class="card" style="margin:0;">
+          <div class="row" style="align-items:center;">
+            <div style="font-size:40px;">${icon.split(' ')[0]}</div>
+            <div style="flex:2;">
+              <div style="font-size:28px; font-weight:700;" class="digits">${Math.round(tempC)}°C</div>
+              <div class="muted">${icon}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function detectPosition(timeoutMs=2000){
+      return new Promise((res)=>{
+        if(!navigator.geolocation){ return res(null); }
+        const t = setTimeout(()=> res(null), timeoutMs);
+        navigator.geolocation.getCurrentPosition(
+          pos=>{ clearTimeout(t); res({lat: pos.coords.latitude, lon: pos.coords.longitude}); },
+          ()=>{ clearTimeout(t); res(null); }, {enableHighAccuracy:false, maximumAge: 60_000}
+        );
+      });
+    }
+
+    async function refreshWeather(){
+      weatherResult.innerHTML = '<div class="skeleton"></div>';
+      try {
+        let loc = null;
+        if(cityInput.value.trim()){
+          loc = await geocodeCity(cityInput.value.trim());
+        } else {
+          loc = await detectPosition();
+          if(!loc){
+            // Fallback: approx by timezone (very rough)
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+            const approx = {
+              'America/Toronto': {lat: 43.7, lon: -79.4},
+              'America/Montreal': {lat: 45.5, lon: -73.6},
+              'America/New_York': {lat: 40.7, lon: -74.0},
+              'America/Los_Angeles': {lat: 34.0, lon: -118.2},
+              'Europe/London': {lat: 51.5, lon: -0.1},
+            }[tz];
+            loc = approx || {lat: 0, lon: 0};
+          }
+        }
+        const w = await getWeather(loc);
+        renderWeather(w);
+      } catch(err){
+        weatherResult.innerHTML = `<div class="muted">Could not load weather. ${err?.message||''}</div>`;
+      }
+    }
+
+    weatherRefresh.addEventListener('click', refreshWeather);
+
+    // Auto-refresh weather when entering weather panel
+    const obs = new MutationObserver(()=>{ if(currentPanel==='weather'){ refreshWeather(); } });
+    obs.observe(Panels.weather, {attributes:true, attributeFilter:['class']});
+
+    /* ==========================================================
+       Console Acceptance Checks (✅/❌)
+       ========================================================== */
+    function test(label, ok){ console.log(`${ok?'✅':'❌'} ${label}`); }
+    (function runTests(){
+      test('Has worker', !!engine);
+      test('Panels exist', !!Panels.alarm && !!Panels.stopwatch && !!Panels.timer && !!Panels.weather);
+      test('Formatter HMSms', fmtHMSms(3723004) === '01:02:03.004');
+      test('Formatter MMSS', fmtMMSS(125000) === '02:05');
+    })();
+
+    // Initial weather lazy load after first interaction to prioritize interactivity
+    window.addEventListener('pointerdown', ()=> { if(!refreshWeather._done){ refreshWeather._done=true; refreshWeather(); } }, {once:true});
+  </script>
+</body>
+</html>
